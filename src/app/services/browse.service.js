@@ -36,10 +36,10 @@ class BrowseService {
 
   fetchLibrary(item, back) {
     if (item.uri === '/') {
+      this.previousSearchContent = undefined;
       this.backHome();
       return false;
     }
-
     let obj = {uri: item.uri};
     if (!back) {
       if  (this.historyUri.length) {
@@ -47,7 +47,18 @@ class BrowseService {
       }
       this.historyUri.push(item);
     } else {
-      this.historyUri.pop();
+      if (this.previousSearchContent !== undefined) {
+        var browsePreviousData = this.previousSearchContent;
+        this.previousSearchContent = undefined;
+        return this.populateBrowseView(browsePreviousData);
+      } else {
+        this.historyUri.pop();
+      }
+    }
+    if (this.navigation && this.navigation.isSearchResult) {
+      this.previousSearchContent = {'navigation': this.navigation};
+    } else {
+      this.previousSearchContent = undefined;
     }
     this.$log.debug('fetchLibrary', obj);
     this.currentFetchRequest = item;
@@ -87,6 +98,19 @@ class BrowseService {
       this.socketService.emit('goTo', emitPayload);
       // this.socketService.emit('search', emitPayload);
     }, 0);
+  }
+
+  populateBrowseView(data) {
+    if (data.navigation) {
+      this.$log.debug('pushBrowseLibrary', data);
+      this.navigation = data.navigation;
+      this.lists = data.navigation.lists;
+      this.info = data.navigation.info;
+      this.breadcrumbs = data.navigation.prev;
+      this.eject = data.navigation.eject;
+      this.rip = data.navigation.rip;
+      this.$rootScope.$broadcast('browseService:fetchEnd');
+    }
   }
 
   filterBy(filter) {
@@ -196,17 +220,7 @@ class BrowseService {
     });
     this.socketService.on('pushBrowseLibrary', (data) => {
       // data = this.mockService.get('getBrowseLibrary');
-      if (data.navigation) {
-        this.$log.debug('pushBrowseLibrary', data);
-        this.lists = data.navigation.lists;
-        this.info = data.navigation.info;
-
-        this.breadcrumbs = data.navigation.prev;
-        this.eject = data.navigation.eject;
-        this.rip = data.navigation.rip;
-
-        this.$rootScope.$broadcast('browseService:fetchEnd');
-      }
+      return this.populateBrowseView(data);
     });
   }
 
